@@ -5,8 +5,7 @@ include(cmake/prelude.cmake)
 project(
     cloxc
     VERSION 0.1.0
-    DESCRIPTION "Short description"
-    HOMEPAGE_URL "https://example.com/"
+    DESCRIPTION "Lox C implementation"
     LANGUAGES C
 )
 
@@ -17,6 +16,9 @@ include(cmake/variables.cmake)
 
 add_library(
     cloxc_lib OBJECT
+    source/chunk.c
+    source/memory.c
+    source/debug.c
     source/lib.c
 )
 

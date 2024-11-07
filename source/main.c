@@ -1,17 +1,16 @@
-#include <stdio.h>
-
-#include "lib.h"
+#include "chunk.h"
+#include "debug.h"
 
 int main(int argc, char const* argv[])
 {
-  struct library lib = create_library();
+  Chunk chunk;
 
-  (void)argc;
-  (void)argv;
+  initChunk(&chunk);
+  writeChunk(&chunk, OP_RETURN);
 
-  if (printf("Hello from %s!", lib.name) < 0) {
-    return 1;
-  }
+  disassembleChunk(&chunk, "Testing chunk");
+
+  freeChunk(&chunk);
 
   return 0;
 }
