@@ -16,6 +16,7 @@ include(cmake/variables.cmake)
 
 add_library(
     cloxc_lib OBJECT
+    source/vm.c
     source/value.c
     source/chunk.c
     source/memory.c
