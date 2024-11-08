@@ -80,7 +80,7 @@ static InterpretResult run(void)
         break;
 
       case OP_DIVIDE:
-        BINARY_OP(-);
+        BINARY_OP(/);
         break;
 
       case OP_NEGATE:
