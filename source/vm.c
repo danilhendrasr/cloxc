@@ -61,6 +61,10 @@ static InterpretResult run(void)
         break;
       }
 
+      case OP_NEGATE:
+        push(-pop());
+        break;
+
       case OP_RETURN: {
         printValue(pop());
         printf("\n");
