@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "chunk.h"
+#include "compiler.h"
 #include "debug.h"
 #include "value.h"
 
@@ -100,9 +101,8 @@ static InterpretResult run(void)
 #undef READ_BYTE
 }
 
-InterpretResult interpret(Chunk* chunk)
+InterpretResult interpret(const char* source)
 {
-  vm.chunk = chunk;
-  vm.ip = vm.chunk->code;
+  compile(source);
   return run();
 }
