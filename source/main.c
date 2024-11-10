@@ -4,9 +4,11 @@
 
 #include "vm.h"
 
+#define MAX_LINE_LENGTH 1024
+
 static void repl(void)
 {
-  char line[1024];
+  char line[MAX_LINE_LENGTH];
   for (;;) {
     printf("> ");
 
