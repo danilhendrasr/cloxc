@@ -63,3 +63,8 @@ elseif(NOT PROJECT_IS_TOP_LEVEL)
 endif()
 
 include(cmake/dev-mode.cmake)
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang") 
+  target_compile_options(cloxc_lib PRIVATE -Wno-float-equal)
+  target_compile_options(cloxc_exe PRIVATE -Wno-float-equal)
+endif()
