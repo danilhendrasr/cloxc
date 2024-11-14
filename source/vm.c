@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 
 VM vm;
@@ -37,9 +38,14 @@ void initVM(void)
 {
   resetStack();
   vm.objects = NULL;
+  initTable(&vm.strings);
 }
 
-void freeVM(void) {}
+void freeVM(void)
+{
+  freeTable(&vm.strings);
+  freeObjects();
+}
 
 void push(Value value)
 {

@@ -16,6 +16,7 @@ include(cmake/variables.cmake)
 
 add_library(
     cloxc_lib OBJECT
+    source/table.c
     source/object.c
     source/scanner.c
     source/compiler.c
