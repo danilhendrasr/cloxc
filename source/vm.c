@@ -118,8 +118,8 @@ static InterpretResult run(void)
       case OP_CONSTANT: {
         Value constant = READ_CONSTANT();
         push(constant);
-        printValue(constant);
-        printf("\n");
+        // printValue(constant);
+        // printf("\n");
         break;
       }
 
@@ -189,9 +189,13 @@ static InterpretResult run(void)
         push(NUMBER_VAL(-AS_NUMBER(pop())));
         break;
 
-      case OP_RETURN: {
+      case OP_PRINT: {
         printValue(pop());
         printf("\n");
+        break;
+      }
+
+      case OP_RETURN: {
         return INTERPRET_OK;
       }
     }
