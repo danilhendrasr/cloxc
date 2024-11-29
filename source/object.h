@@ -7,10 +7,12 @@
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+#define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
+#define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
 #define AS_NATIVE(value) (((ObjNative*)AS_OBJ(value))->function)
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
@@ -18,8 +20,10 @@
 
 typedef enum {
   OBJ_FUNCTION,
+  OBJ_CLOSURE,
   OBJ_STRING,
-  OBJ_NATIVE
+  OBJ_NATIVE,
+  OBJ_UPVALUE
 } ObjType;
 
 struct Obj {
@@ -30,6 +34,7 @@ struct Obj {
 typedef struct {
   Obj obj;
   int arity;
+  int upvalueCount;
   Chunk chunk;
   ObjString* name;
 } ObjFunction;
@@ -41,6 +46,20 @@ typedef struct {
   NativeFn function;
 } ObjNative;
 
+typedef struct {
+  Obj obj;
+  Value* location;
+  Value closed;
+  struct ObjUpvalue* next;
+} ObjUpvalue;
+
+typedef struct {
+  Obj obj;
+  ObjFunction* function;
+  ObjUpvalue** upvalues;
+  int upvalueCount;
+} ObjClosure;
+
 struct ObjString {
   Obj obj;
   int length;
@@ -48,6 +67,8 @@ struct ObjString {
   uint32_t hash;
 };
 
+ObjUpvalue* newUpvalue(Value* slot);
+ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction(void);
 ObjNative* newNative(NativeFn function);
 ObjString* takeString(char* chars, int length);
