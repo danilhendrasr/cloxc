@@ -1,6 +1,7 @@
 #ifndef clox_vm_h
 #define clox_vm_h
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "chunk.h"
@@ -26,7 +27,12 @@ typedef struct {
   uint8_t* ip;
   Value stack[STACK_MAX];
   Value* stackTop;
+  size_t bytesAllocated;
+  size_t nextGC;
   Obj* objects;
+  int grayCount;
+  int grayCapacity;
+  Obj** grayStack;
   Table strings;
   ObjUpvalue* openUpvalues;
   Table globals;
