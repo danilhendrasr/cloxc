@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include "object.h"
 #include "value.h"
 
 #define TABLE_MAX_LOAD_FACTOR 0.75
