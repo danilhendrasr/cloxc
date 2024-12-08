@@ -34,6 +34,7 @@ typedef struct {
   int grayCapacity;
   Obj** grayStack;
   Table strings;
+  ObjString* initString;
   ObjUpvalue* openUpvalues;
   Table globals;
 } VM;

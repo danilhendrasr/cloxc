@@ -59,10 +59,12 @@ typedef struct {
 
 typedef enum {
   TYPE_FUNCTION,
-  TYPE_SCRIPT
+  TYPE_SCRIPT,
+  TYPE_INITIALIZER,
+  TYPE_METHOD,
 } FunctionType;
 
-struct Compiler {
+typedef struct Compiler {
   struct Compiler* enclosing;
   ObjFunction* function;
   FunctionType type;
@@ -71,11 +73,18 @@ struct Compiler {
   int localCount;
   Upvalue upvalues[UINT8_COUNT];
   int scopeDepth;
-};
+} Compiler;
+
+typedef struct ClassCompiler {
+  struct ClassCompiler* enclosing;
+} ClassCompiler;
 
 Parser parser;
-struct Compiler* current = NULL;
+Compiler* current = NULL;
+ClassCompiler* currentClass = NULL;
 Chunk* compilingChunk;
+
+static void namedVariable(Token name, bool canAssign);
 
 static Chunk* currentChunk(void)
 {
@@ -184,6 +193,12 @@ static int emitJump(uint8_t instruction)
 
 static void emitReturn(void)
 {
+  if (current->type == TYPE_INITIALIZER) {
+    emitBytes(OP_GET_LOCAL, 0);
+  } else {
+    emitByte(OP_NIL);
+  }
+
   emitByte(OP_NIL);
   emitByte(OP_RETURN);
 }
@@ -215,7 +230,7 @@ static void patchJump(int offset)
   currentChunk()->code[offset + 1] = jump & 0xff;
 }
 
-static void initCompiler(struct Compiler* compiler, FunctionType type)
+static void initCompiler(Compiler* compiler, FunctionType type)
 {
   compiler->function = NULL;
   compiler->type = type;
@@ -231,8 +246,13 @@ static void initCompiler(struct Compiler* compiler, FunctionType type)
   Local* local = &current->locals[current->localCount++];
   local->depth = 0;
   local->isCaptured = false;
-  local->name.start = "";
-  local->name.length = 0;
+  if (type != TYPE_FUNCTION) {
+    local->name.start = "this";
+    local->name.length = 4;
+  } else {
+    local->name.start = "";
+    local->name.length = 0;
+  }
 }
 
 static ObjFunction* endCompiler(void)
@@ -317,7 +337,7 @@ static bool identifiersEqual(Token* a, Token* b)
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
-static int resolveLocal(struct Compiler* compiler, Token* name)
+static int resolveLocal(Compiler* compiler, Token* name)
 {
   for (int i = compiler->localCount - 1; i >= 0; i--) {
     Local* local = &compiler->locals[i];
@@ -332,7 +352,7 @@ static int resolveLocal(struct Compiler* compiler, Token* name)
   return -1;
 }
 
-static int addUpvalue(struct Compiler* compiler, uint8_t index, bool isLocal)
+static int addUpvalue(Compiler* compiler, uint8_t index, bool isLocal)
 {
   int upvalueCount = compiler->function->upvalueCount;
 
@@ -353,7 +373,7 @@ static int addUpvalue(struct Compiler* compiler, uint8_t index, bool isLocal)
   return compiler->function->upvalueCount++;
 }
 
-static int resolveUpvalue(struct Compiler* compiler, Token* name)
+static int resolveUpvalue(Compiler* compiler, Token* name)
 {
   if (compiler->enclosing == NULL) {
     return -1;
@@ -559,7 +579,7 @@ static void block(void)
 
 static void function(FunctionType type)
 {
-  struct Compiler compiler;
+  Compiler compiler;
   initCompiler(&compiler, type);
   beginScope();
 
@@ -587,17 +607,45 @@ static void function(FunctionType type)
   }
 }
 
+static void method(void)
+{
+  consume(TOKEN_IDENTIFIER, "Expected method name.");
+  uint8_t constant = identifierConstant(&parser.previous);
+
+  FunctionType type = TYPE_METHOD;
+  if (parser.previous.length == 4
+      && memcmp(parser.previous.start, "init", 4) == 0)
+  {
+    type = TYPE_INITIALIZER;
+  }
+
+  function(type);
+  emitBytes(OP_METHOD, constant);
+}
+
 static void classDeclaration(void)
 {
   consume(TOKEN_IDENTIFIER, "Expected class name after 'class' keyword.");
+  Token className = parser.previous;
   uint8_t nameConstant = identifierConstant(&parser.previous);
   declareVariable();
 
   emitBytes(OP_CLASS, nameConstant);
   defineVariable(nameConstant);
 
+  ClassCompiler classCompiler;
+  classCompiler.enclosing = currentClass;
+  currentClass = &classCompiler;
+
+  namedVariable(className, false);
   consume(TOKEN_LEFT_BRACE, "Expected '{' before class body.");
+  while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+    method();
+  }
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
+  emitByte(OP_POP);
+
+  currentClass = currentClass->enclosing;
 }
 
 static void funDeclaration(void)
@@ -711,6 +759,10 @@ static void returnStatement(void)
   if (match(TOKEN_SEMICOLON)) {
     emitReturn();
   } else {
+    if (current->type == TYPE_INITIALIZER) {
+      error("Can't return a value from an initializer.");
+    }
+
     expression();
     consume(TOKEN_SEMICOLON, "Expected ';' after return value.");
     emitByte(OP_RETURN);
@@ -857,6 +909,16 @@ static void variable(bool canAssign)
   namedVariable(parser.previous, canAssign);
 }
 
+static void this_(bool canAssign)
+{
+  if (currentClass == NULL) {
+    error("Can't use 'this' outside of a class.");
+    return;
+  }
+
+  variable(false);
+}
+
 static void unary(bool canAssign)
 {
   TokenType operatorType = parser.previous.type;
@@ -910,7 +972,7 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
+    [TOKEN_THIS] = {this_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -926,7 +988,7 @@ static ParseRule* getRule(TokenType type)
 ObjFunction* compile(const char* source)
 {
   initScanner(source);
-  struct Compiler compiler;
+  Compiler compiler;
   initCompiler(&compiler, TYPE_SCRIPT);
 
   parser.hadError = false;
@@ -944,7 +1006,7 @@ ObjFunction* compile(const char* source)
 
 void markCompilerRoots(void)
 {
-  struct Compiler* compiler = current;
+  Compiler* compiler = current;
   while (compiler != NULL) {
     markObject((Obj*)compiler->function);
     compiler = compiler->enclosing;
